@@ -1,0 +1,40 @@
+-- Datenbank: @@DATABASE@@
+-- Feature:   @@FEATURE@@
+-- Erstellt:  @@CREATED@@
+-- ============================================================
+-- Konfiguration
+-- ============================================================
+DECLARE @Tabellenname NVARCHAR(128) = '@@TABLE@@';
+DECLARE @AlterName    NVARCHAR(128) = '@@OLD@@';
+DECLARE @NeuerName    NVARCHAR(128) = '@@NEW@@';
+DECLARE @Schema       NVARCHAR(128) = '@@SCHEMA@@';
+
+-- ============================================================
+-- Umbenennung
+-- ============================================================
+IF EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = @Tabellenname
+      AND COLUMN_NAME = @AlterName
+      AND TABLE_SCHEMA = @Schema
+)
+BEGIN
+    DECLARE @AlterVoll NVARCHAR(257) = @Schema + '.' + @Tabellenname + '.' + @AlterName;
+    EXEC sp_rename @AlterVoll, @NeuerName, 'COLUMN';
+    PRINT 'Spalte umbenannt: ' + @AlterVoll + ' -> ' + @NeuerName;
+END
+ELSE IF EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = @Tabellenname
+      AND COLUMN_NAME = @NeuerName
+      AND TABLE_SCHEMA = @Schema
+)
+BEGIN
+    -- Bereits umbenannt (z.B. Instanz wurde schon mit dem neuen Stand aufgebaut)
+    PRINT 'Spalte ' + @Schema + '.' + @Tabellenname + '.' + @NeuerName + ' existiert bereits - nichts zu tun';
+END
+ELSE
+BEGIN
+    DECLARE @Fehler NVARCHAR(500) = 'Spalte ' + @Schema + '.' + @Tabellenname + '.' + @AlterName + ' nicht gefunden';
+    THROW 50001, @Fehler, 1;
+END

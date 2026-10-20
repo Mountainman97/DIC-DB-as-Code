@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Conservative publish profile for TEST/PROD (sqlpackage Publish / Script / DeployReport).
+  Used by db-provision-dev.sh and db-diff.sh via the "profile" option or the
+  PUBLISH_PROFILE variable. Command-line properties (/p:...) take precedence.
+  All properties: https://learn.microsoft.com/sql/tools/sqlpackage/sqlpackage-publish
+-->
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Abort if a change could cause data loss -->
+    <BlockOnPossibleDataLoss>True</BlockOnPossibleDataLoss>
+    <!-- Do NOT drop objects that only exist in the target database -->
+    <DropObjectsNotInSource>False</DropObjectsNotInSource>
+    <!-- Wrap the change script in a transaction (rollback on error) -->
+    <IncludeTransactionalScripts>True</IncludeTransactionalScripts>
+    <!-- Generate default values for new NOT NULL columns -->
+    <GenerateSmartDefaults>True</GenerateSmartDefaults>
+    <!-- Security objects are environment-specific and are not deployed -->
+    <IgnorePermissions>True</IgnorePermissions>
+    <IgnoreRoleMembership>True</IgnoreRoleMembership>
+    <IgnoreUserSettingsObjects>True</IgnoreUserSettingsObjects>
+    <ExcludeObjectTypes>Users;Logins;RoleMembership;Permissions;Credentials;DatabaseScopedCredentials;ServerRoleMembership;ServerRoles</ExcludeObjectTypes>
+    <!-- Leave database options (recovery model etc.) untouched -->
+    <ScriptDatabaseOptions>False</ScriptDatabaseOptions>
+    <!-- Ignore column order (avoids table rebuilds) -->
+    <IgnoreColumnOrder>True</IgnoreColumnOrder>
+    <!-- No backup by sqlpackage itself (see db-backup.sh instead) -->
+    <BackupDatabaseBeforeChanges>False</BackupDatabaseBeforeChanges>
+    <VerifyDeployment>True</VerifyDeployment>
+  </PropertyGroup>
+  <!--
+  SqlCmd variables (e.g. for references to other databases):
+  <ItemGroup>
+    <SqlCmdVariable Include="DIZ_NET">
+      <Value>DIZ_NET</Value>
+    </SqlCmdVariable>
+  </ItemGroup>
+  -->
+</Project>

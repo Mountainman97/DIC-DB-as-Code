@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SDK-artiges SQL-Projekt (MSBuild.Sdk.SqlProj), erzeugt durch db-extract.sh.
+  Alle *.sql-Dateien unterhalb dieses Ordners werden automatisch eingebunden.
+  Build:  dotnet build -c Release   ->  bin/Release/net8.0/@@PROJECT_NAME@@.dacpac
+  Referenzen auf andere Datenbanken: siehe
+  https://github.com/rr-wfm/MSBuild.Sdk.SqlProj (Abschnitt "References")
+-->
+<Project Sdk="MSBuild.Sdk.SqlProj/@@SDK_VERSION@@">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SqlServerVersion>@@SQL_VERSION@@</SqlServerVersion>
+  </PropertyGroup>
+@@REFERENCES@@
+</Project>

@@ -1,0 +1,71 @@
+# Azure DevOps (Server) – example with a Linux agent
+# Assumptions: this repository is included in the database repository under
+#              tools/dic-db-as-code (e.g. as Git submodule), the SQL project lives
+#              under database/DIZ_NET, and a variable group "diz-db" holds the
+#              secret DB_PASSWORD. See docs/08-pipelines.md.
+trigger:
+  branches: { include: [ main ] }
+
+pool:
+  name: Linux-Agents
+
+variables:
+  - group: diz-db
+  - name: TOOLKIT
+    value: tools/dic-db-as-code/toolkit
+
+stages:
+  - stage: Build
+    jobs:
+      - job: Build
+        steps:
+          - checkout: self
+            submodules: true
+          - bash: $(TOOLKIT)/scripts/db-build.sh --project database/DIZ_NET --output $(Build.ArtifactStagingDirectory)/DIZ_NET.dacpac
+            displayName: Build DACPAC
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: dacpac
+
+  - stage: Preview_Test
+    dependsOn: Build
+    jobs:
+      - job: Preview
+        steps:
+          - checkout: self
+            submodules: true
+          - download: current
+            artifact: dacpac
+          - bash: |
+              $(TOOLKIT)/scripts/db-diff.sh --env-file config/test.env -d DIZ_NET \
+                --dacpac $(Pipeline.Workspace)/dacpac/DIZ_NET.dacpac \
+                --output-dir $(Build.ArtifactStagingDirectory)/preview --name DIZ_NET_preview_$(Build.BuildId)
+              $(TOOLKIT)/scripts/db-data-apply.sh --env-file config/test.env -d DIZ_NET --dry-run
+            env:
+              DB_PASSWORD: $(DB_PASSWORD)
+            displayName: Preview schema and data changes (no changes applied)
+          - publish: $(Build.ArtifactStagingDirectory)/preview
+            artifact: preview
+
+  - stage: Deploy_Test
+    dependsOn: Preview_Test
+    jobs:
+      - deployment: Deploy
+        environment: TEST            # configure the approval on the environment
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  submodules: true
+                - download: current
+                  artifact: dacpac
+                - bash: |
+                    $(TOOLKIT)/scripts/db-backup.sh run --env-file config/test.env -d DIZ_NET --mode snapshot -- bash -ec '
+                      $(TOOLKIT)/scripts/db-apply-renames.sh --env-file config/test.env --dir renames --yes
+                      SCRIPT=$($(TOOLKIT)/scripts/db-diff.sh --env-file config/test.env -d DIZ_NET \
+                                 --dacpac $(Pipeline.Workspace)/dacpac/DIZ_NET.dacpac --output-dir artifacts/diff)
+                      $(TOOLKIT)/scripts/db-apply-diff.sh --env-file config/test.env -d DIZ_NET --script "$SCRIPT" --yes
+                      $(TOOLKIT)/scripts/db-data-apply.sh --env-file config/test.env -d DIZ_NET --yes'
+                  env:
+                    DB_PASSWORD: $(DB_PASSWORD)
+                  displayName: Renames, schema and data (with snapshot rollback)

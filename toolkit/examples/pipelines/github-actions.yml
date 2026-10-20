@@ -1,0 +1,44 @@
+# GitHub Actions – example (copy to .github/workflows/db.yml in the database repository)
+# Assumptions: self-hosted Linux runner with network access to SQL Server and
+#              sqlpackage/sqlcmd/.NET SDK installed, this repository as submodule
+#              under tools/dic-db-as-code, secret DB_PASSWORD. See docs/08-pipelines.md.
+name: Database
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  TOOLKIT: tools/dic-db-as-code/toolkit
+
+jobs:
+  preview:
+    runs-on: [ self-hosted, linux ]
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - name: Preview schema and data changes
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          $TOOLKIT/scripts/db-diff.sh --env-file config/test.env -d DIZ_NET \
+            --project database/DIZ_NET --output-dir artifacts/preview --name DIZ_NET_${{ github.run_id }}
+          $TOOLKIT/scripts/db-data-apply.sh --env-file config/test.env -d DIZ_NET --dry-run
+      - uses: actions/upload-artifact@v4
+        with: { name: preview, path: artifacts/preview }
+
+  deploy:
+    needs: preview
+    runs-on: [ self-hosted, linux ]
+    environment: test               # configure required reviewers on the environment
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - name: Renames, schema and data
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          $TOOLKIT/scripts/db-apply-renames.sh --env-file config/test.env --dir renames --yes
+          SCRIPT=$($TOOLKIT/scripts/db-diff.sh --env-file config/test.env -d DIZ_NET --project database/DIZ_NET --output-dir artifacts/diff)
+          $TOOLKIT/scripts/db-apply-diff.sh --env-file config/test.env -d DIZ_NET --script "$SCRIPT" --yes
+          $TOOLKIT/scripts/db-data-apply.sh --env-file config/test.env -d DIZ_NET --yes

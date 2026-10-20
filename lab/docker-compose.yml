@@ -1,0 +1,114 @@
+# -----------------------------------------------------------------------------
+# DIC-DB-as-Code lab: three SQL Server instances + a tools container
+#
+#   DIZPROD  – "production" with DIZ_NET and DIZ_NET_stage incl. test data
+#   DIZTEST  – empty instance
+#   DIZDEV   – empty instance
+#   DIZTOOLS – Linux container with sqlpackage, sqlcmd, .NET SDK and the toolkit
+#
+# Start:   docker compose up -d --build
+# Shell:   docker exec -it DIZTOOLS bash
+# Stop:    docker compose down        (data is kept in the volumes)
+# Reset:   docker compose down -v     (delete everything, PROD is re-seeded)
+# See docs/09-lab.md for a full walkthrough.
+# -----------------------------------------------------------------------------
+name: dic-db-as-code-lab
+
+x-mssql: &mssql
+  image: mcr.microsoft.com/mssql/server:2022-latest
+  platform: linux/amd64            # Apple Silicon: runs via Rosetta emulation
+  restart: unless-stopped
+  networks: [diznet]
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -b -Q 'SELECT 1' -o /dev/null || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -b -Q 'SELECT 1' -o /dev/null || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 30
+    start_period: 30s
+
+services:
+  dizprod:
+    <<: *mssql
+    container_name: DIZPROD
+    hostname: dizprod
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${DIZPROD_SA_PASSWORD}"
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+      TZ: "Europe/Berlin"
+    ports: ["14331:1433"]
+    volumes: [dizprod-data:/var/opt/mssql]
+
+  diztest:
+    <<: *mssql
+    container_name: DIZTEST
+    hostname: diztest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${DIZTEST_SA_PASSWORD}"
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+      TZ: "Europe/Berlin"
+    ports: ["14332:1433"]
+    volumes: [diztest-data:/var/opt/mssql]
+
+  dizdev:
+    <<: *mssql
+    container_name: DIZDEV
+    hostname: dizdev
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${DIZDEV_SA_PASSWORD}"
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+      TZ: "Europe/Berlin"
+    ports: ["14333:1433"]
+    volumes: [dizdev-data:/var/opt/mssql]
+
+  # One-off job: creates the databases and test data on DIZPROD
+  dizprod-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: DIZPROD-INIT
+    networks: [diznet]
+    depends_on:
+      dizprod: { condition: service_healthy }
+    environment:
+      MSSQL_SA_PASSWORD: "${DIZPROD_SA_PASSWORD}"
+    volumes: ["./init/prod:/init:ro"]
+    entrypoint: ["/bin/bash", "/init/init.sh"]
+    restart: "no"
+
+  # Linux tools container that runs the toolkit scripts
+  tools:
+    build:
+      context: ./tools
+    platform: linux/amd64
+    container_name: DIZTOOLS
+    hostname: diztools
+    networks: [diznet]
+    working_dir: /workspace
+    environment:
+      DIZPROD_SA_PASSWORD: "${DIZPROD_SA_PASSWORD}"
+      DIZTEST_SA_PASSWORD: "${DIZTEST_SA_PASSWORD}"
+      DIZDEV_SA_PASSWORD: "${DIZDEV_SA_PASSWORD}"
+    volumes:
+      - ../toolkit:/toolkit                 # the toolkit (live mount, changes take effect immediately)
+      - ./workspace:/workspace              # simulated database repository
+      - nuget-cache:/root/.nuget/packages   # NuGet cache (faster builds)
+    command: ["sleep", "infinity"]
+    depends_on:
+      dizprod-init: { condition: service_completed_successfully }
+      diztest: { condition: service_healthy }
+      dizdev: { condition: service_healthy }
+
+networks:
+  diznet:
+    name: diznet
+
+volumes:
+  dizprod-data:
+  diztest-data:
+  dizdev-data:
+  nuget-cache:

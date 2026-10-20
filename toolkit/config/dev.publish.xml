@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Publish profile for DEV instances (db-provision-dev.sh).
+  More permissive than default.publish.xml: DEV databases are disposable and are
+  aligned exactly with the project (data loss allowed, extra objects dropped).
+-->
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <BlockOnPossibleDataLoss>False</BlockOnPossibleDataLoss>
+    <DropObjectsNotInSource>True</DropObjectsNotInSource>
+    <DoNotDropObjectTypes>Users;Logins;RoleMembership;Permissions</DoNotDropObjectTypes>
+    <ExcludeObjectTypes>Users;Logins;RoleMembership;Permissions;Credentials;DatabaseScopedCredentials;ServerRoleMembership;ServerRoles</ExcludeObjectTypes>
+    <IgnorePermissions>True</IgnorePermissions>
+    <IgnoreRoleMembership>True</IgnoreRoleMembership>
+    <GenerateSmartDefaults>True</GenerateSmartDefaults>
+    <IncludeTransactionalScripts>True</IncludeTransactionalScripts>
+    <!-- Apply database options from the DACPAC to newly created DEV databases -->
+    <ScriptDatabaseOptions>True</ScriptDatabaseOptions>
+  </PropertyGroup>
+</Project>

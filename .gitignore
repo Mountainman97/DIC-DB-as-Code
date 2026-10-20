@@ -1,0 +1,20 @@
+# Build and run outputs
+artifacts/
+bin/
+obj/
+*.log
+
+# Local, non-committed configuration and secrets
+*.local.env
+.env.local
+
+# OS / editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Lab workspace results (generated while following docs/07-lab.md)
+lab/workspace/database/
+lab/workspace/data/
+lab/workspace/renames/
+lab/workspace/.git/

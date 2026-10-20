@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SDK-artiges SQL-Projekt (Microsoft.Build.Sql), erzeugt durch db-extract.sh.
+  Alle *.sql-Dateien unterhalb dieses Ordners werden automatisch Teil des
+  Datenbankmodells (bin/ und obj/ ausgenommen).
+  Build:  dotnet build -c Release   ->  bin/Release/@@PROJECT_NAME@@.dacpac
+-->
+<Project DefaultTargets="Build">
+  <Sdk Name="Microsoft.Build.Sql" Version="@@SDK_VERSION@@" />
+  <PropertyGroup>
+    <Name>@@PROJECT_NAME@@</Name>
+    <DSP>@@DSP@@</DSP>
+    <ModelCollation>@@COLLATION@@</ModelCollation>
+  </PropertyGroup>
+  <!--
+  Pre-/Post-Deployment-Skripte (optional):
+  <ItemGroup>
+    <PreDeploy Include="Scripts/Script.PreDeployment.sql" />
+    <PostDeploy Include="Scripts/Script.PostDeployment.sql" />
+  </ItemGroup>
+  -->
+@@REFERENCES@@
+</Project>

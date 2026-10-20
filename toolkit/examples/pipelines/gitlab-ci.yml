@@ -1,0 +1,45 @@
+# GitLab CI – example (copy to .gitlab-ci.yml in the database repository)
+# Assumptions: runner image with sqlpackage, sqlcmd and .NET SDK (e.g. lab/tools/Dockerfile),
+#              this repository as submodule under tools/dic-db-as-code,
+#              CI/CD variable DB_PASSWORD (masked, protected). See docs/08-pipelines.md.
+variables:
+  TOOLKIT: tools/dic-db-as-code/toolkit
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages: [build, preview, deploy]
+
+build:
+  stage: build
+  script:
+    - $TOOLKIT/scripts/db-build.sh --project database/DIZ_NET --output artifacts/DIZ_NET.dacpac
+  artifacts:
+    paths: [artifacts/]
+
+preview:test:
+  stage: preview
+  script:
+    - $TOOLKIT/scripts/db-diff.sh --env-file config/test.env -d DIZ_NET
+        --dacpac artifacts/DIZ_NET.dacpac --output-dir artifacts/preview --name DIZ_NET_$CI_PIPELINE_ID
+    - $TOOLKIT/scripts/db-data-apply.sh --env-file config/test.env -d DIZ_NET --dry-run
+  artifacts:
+    paths: [artifacts/preview/]
+
+deploy:test:
+  stage: deploy
+  when: manual                      # manual approval
+  environment: test
+  script:
+    - $TOOLKIT/scripts/db-apply-renames.sh --env-file config/test.env --dir renames --yes
+    - SCRIPT=$($TOOLKIT/scripts/db-diff.sh --env-file config/test.env -d DIZ_NET --dacpac artifacts/DIZ_NET.dacpac --output-dir artifacts/diff)
+    - $TOOLKIT/scripts/db-apply-diff.sh --env-file config/test.env -d DIZ_NET --script "$SCRIPT" --yes
+    - $TOOLKIT/scripts/db-data-apply.sh --env-file config/test.env -d DIZ_NET --yes
+
+# One DEV database per merge request
+provision:dev:
+  stage: deploy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - $TOOLKIT/scripts/db-provision-dev.sh --env-file config/dev.env
+        -d DIZ_NET_DEV_$CI_MERGE_REQUEST_IID --dacpac artifacts/DIZ_NET.dacpac
+        --if-exists update --renames renames --data data/DIZ_NET

@@ -1,0 +1,37 @@
+-- Datenbank: @@DATABASE@@
+-- Feature:   @@FEATURE@@
+-- Erstellt:  @@CREATED@@
+-- ============================================================
+-- Konfiguration
+-- ============================================================
+DECLARE @AlterName  NVARCHAR(128) = '@@OLD@@';
+DECLARE @NeuerName  NVARCHAR(128) = '@@NEW@@';
+DECLARE @Schema     NVARCHAR(128) = '@@SCHEMA@@';
+
+-- ============================================================
+-- Umbenennung
+-- ============================================================
+IF EXISTS (
+    SELECT 1 FROM sys.tables
+    WHERE name = @AlterName
+      AND schema_id = SCHEMA_ID(@Schema)
+)
+BEGIN
+    DECLARE @AlterVoll NVARCHAR(257) = @Schema + '.' + @AlterName;
+    EXEC sp_rename @AlterVoll, @NeuerName;
+    PRINT 'Tabelle umbenannt: ' + @AlterVoll + ' -> ' + @NeuerName;
+END
+ELSE IF EXISTS (
+    SELECT 1 FROM sys.tables
+    WHERE name = @NeuerName
+      AND schema_id = SCHEMA_ID(@Schema)
+)
+BEGIN
+    -- Bereits umbenannt (z.B. Instanz wurde schon mit dem neuen Stand aufgebaut)
+    PRINT 'Tabelle ' + @Schema + '.' + @NeuerName + ' existiert bereits - nichts zu tun';
+END
+ELSE
+BEGIN
+    DECLARE @Fehler NVARCHAR(500) = 'Tabelle ' + @Schema + '.' + @AlterName + ' nicht gefunden';
+    THROW 50001, @Fehler, 1;
+END
